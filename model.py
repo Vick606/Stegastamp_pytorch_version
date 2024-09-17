@@ -92,7 +92,7 @@ class StegaStampEncoder(nn.Module):
         secrect, image = inputs
         secrect = secrect - .5
         image = image - .5
-        # image is between [-0..5,0.5]
+        # image is between [-0.5,0.5]
         secrect = self.secret_dense(secrect)
         secrect = secrect.reshape(-1, 3, 50, 50)
         secrect_enlarged = nn.Upsample(scale_factor=(8, 8))(secrect)
@@ -322,47 +322,47 @@ def build_model(encoder, decoder, discriminator, lpips_fn, secret_input, image_i
     test_transform = transform_net(image_input, args, global_step)
     
     input_warped = torchgeometry.warp_perspective(image_input, M[:, 1, :, :], dsize=(400, 400), flags='bilinear')
-    print("Line 325: input_warped min: {:.4f}, max: {:.4f}".format(input_warped.min().item(), input_warped.max().item()))
+    # print("Line 325: input_warped min: {:.4f}, max: {:.4f}".format(input_warped.min().item(), input_warped.max().item()))
     
     mask_warped = torchgeometry.warp_perspective(torch.ones_like(input_warped), M[:, 1, :, :], dsize=(400, 400), flags='bilinear')
-    print("Line 328: mask_warped min: {:.4f}, max: {:.4f}".format(mask_warped.min().item(), mask_warped.max().item()))
+    # print("Line 328: mask_warped min: {:.4f}, max: {:.4f}".format(mask_warped.min().item(), mask_warped.max().item()))
     
     input_warped += (1 - mask_warped) * image_input
-    print("Line 331: input_warped after addition min: {:.4f}, max: {:.4f}".format(input_warped.min().item(), input_warped.max().item()))
+    # print("Line 331: input_warped after addition min: {:.4f}, max: {:.4f}".format(input_warped.min().item(), input_warped.max().item()))
     
     residual_warped = encoder((secret_input, input_warped))
     encoded_warped = residual_warped + input_warped
     
     residual = torchgeometry.warp_perspective(residual_warped, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-    print("Line 337: residual min: {:.4f}, max: {:.4f}".format(residual.min().item(), residual.max().item()))
+    # print("Line 337: residual min: {:.4f}, max: {:.4f}".format(residual.min().item(), residual.max().item()))
     
     if borders == 'no_edge':
         encoded_image = image_input + residual
     elif borders == 'black':
         encoded_image = residual_warped + input_warped
         encoded_image = torchgeometry.warp_perspective(encoded_image, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 344: encoded_image (black) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
+        # print("Line 344: encoded_image (black) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
         input_unwarped = torchgeometry.warp_perspective(image_input, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 346: input_unwarped (black) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
+        # print("Line 346: input_unwarped (black) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
     elif borders.startswith('random'):
         mask = torchgeometry.warp_perspective(torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
         encoded_image = residual_warped + input_unwarped
         encoded_image = torchgeometry.warp_perspective(encoded_image, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 351: encoded_image (random) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
+        # print("Line 351: encoded_image (random) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
         input_unwarped = torchgeometry.warp_perspective(input_warped, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 353: input_unwarped (random) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
+        # print("Line 353: input_unwarped (random) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
     elif borders == 'white':
         mask = torchgeometry.warp_perspective(torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
         encoded_image = residual_warped + input_warped
         encoded_image = torchgeometry.warp_perspective(encoded_image, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 358: encoded_image (white) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
+        # print("Line 358: encoded_image (white) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
         input_unwarped = torchgeometry.warp_perspective(input_warped, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 360: input_unwarped (white) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
+        # print("Line 360: input_unwarped (white) min: {:.4f}, max: {:.4f}".format(input_unwarped.min().item(), input_unwarped.max().item()))
     elif borders == 'image':
         mask = torchgeometry.warp_perspective(torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
         encoded_image = residual_warped + input_warped
         encoded_image = torchgeometry.warp_perspective(encoded_image, M[:, 0, :, :], dsize=(400, 400), flags='bilinear')
-        print("Line 365: encoded_image (image) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
+        # print("Line 365: encoded_image (image) min: {:.4f}, max: {:.4f}".format(encoded_image.min().item(), encoded_image.max().item()))
         encoded_image += (1 - mask) * torch.roll(image_input, 1, 0)
     
     if borders == 'no_edge':

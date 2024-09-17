@@ -21,7 +21,7 @@ secret_loss_scale: 2.5
 secret_loss_ramp: 1
 G_loss_scale: 0.5
 G_loss_ramp: 15_000
-borders: 'black'  # choices=['no_edge','black','random','randomrgb','image','white']
+borders: 'no_edge'  # choices=['no_edge','black','random','randomrgb','image','white']
 
 # YUV scales
 y_scale: 1
