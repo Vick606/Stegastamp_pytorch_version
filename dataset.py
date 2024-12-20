@@ -8,11 +8,13 @@ import torch
 
 
 class StegaData(Dataset):
-    def __init__(self, data_path, secret_size=100, size=(400, 400)):
+    def __init__(self, data_path, secret_size=100, size=(400, 400), subset_size=None):
         self.data_path = data_path
         self.secret_size = secret_size
         self.size = size
         self.files_list = glob(f'{self.data_path}/images*/images/*/*.jpg')
+        if subset_size:
+            self.files_list = self.files_list[:subset_size]
         self.to_tensor = transforms.ToTensor()
 
     def __getitem__(self, idx):
