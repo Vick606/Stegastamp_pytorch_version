@@ -75,7 +75,7 @@ def main():
     total_steps = len(dataset) // args.batch_size + 1
     global_step = 0
 
-    if args.pretrained:
+    if args.pretrained != "None":
         print(f"Resuming training from {args.pretrained}...")
         checkpoint = torch.load(args.pretrained)
         encoder.load_state_dict(checkpoint['encoder'])
