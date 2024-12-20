@@ -15,7 +15,6 @@ from torch.utils.tensorboard import SummaryWriter
 import lpips
 import time
 from datetime import datetime, timedelta
-from torch.cuda.amp import autocast, GradScaler
 
 CHECKPOINT_MARK_1 = 10_000
 CHECKPOINT_MARK_2 = 1500
@@ -57,9 +56,6 @@ def main():
         decoder = decoder.cuda()
         discriminator = discriminator.cuda()
         lpips_alex.cuda()
-
-    # Initialize GradScaler for mixed precision
-    scaler = GradScaler()
 
     d_vars = discriminator.parameters()
     g_vars = [{'params': encoder.parameters()},
@@ -112,33 +108,36 @@ def main():
             if args.cuda:
                 Ms = Ms.cuda()
 
+            # Ensure tensors are in full precision
+            image_input = image_input.float()
+            secret_input = secret_input.float()
+            Ms = Ms.float()
+
             loss_scales = [l2_loss_scale, 0, secret_loss_scale, 0]
             yuv_scales = [args.y_scale, args.u_scale, args.v_scale]
 
-            # Mixed precision forward pass
-            with autocast():
-                loss, secret_loss, D_loss, bit_acc, str_acc = model.build_model(encoder, decoder, discriminator, lpips_alex,
-                                                                                secret_input, image_input,
-                                                                                args.l2_edge_gain, args.borders,
-                                                                                args.secret_size, Ms, loss_scales,
-                                                                                yuv_scales, args, global_step, writer)
+            # Full precision forward pass
+            loss, secret_loss, D_loss, bit_acc, str_acc = model.build_model(
+                encoder, decoder, discriminator, lpips_alex,
+                secret_input, image_input,
+                args.l2_edge_gain, args.borders,
+                args.secret_size, Ms, loss_scales,
+                yuv_scales, args, global_step, writer
+            )
 
-            # Mixed precision backward pass and optimization
+            # Backward pass and optimization
             if no_im_loss:
                 optimize_secret_loss.zero_grad()
-                scaler.scale(secret_loss).backward()
-                scaler.step(optimize_secret_loss)
-                scaler.update()
+                secret_loss.backward()
+                optimize_secret_loss.step()
             else:
                 optimize_loss.zero_grad()
-                scaler.scale(loss).backward()
-                scaler.step(optimize_loss)
-                scaler.update()
+                loss.backward()
+                optimize_loss.step()
                 if not args.no_gan:
                     optimize_dis.zero_grad()
-                    scaler.scale(D_loss).backward()
-                    scaler.step(optimize_dis)
-                    scaler.update()
+                    D_loss.backward()
+                    optimize_dis.step()
 
             step_time = time.time() - step_start_time
             total_time_elapsed = time.time() - start_time
@@ -184,7 +183,5 @@ def main():
     torch.save(encoder, os.path.join(args.saved_models, f"encoder_{global_step}.pth"))
     torch.save(decoder, os.path.join(args.saved_models, f"decoder_{global_step}.pth"))
 
-
 if __name__ == '__main__':
     main()
-
