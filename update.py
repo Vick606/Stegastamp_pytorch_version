@@ -8,8 +8,8 @@ def modify_yaml(file_path, pretrained_value, checkpoint_value):
             config = yaml.safe_load(file)
 
         # Modify the 'pretrained' and 'checkpoint' attributes
-        config['pretrained'] = pretrained_value
-        config['checkpoint'] = checkpoint_value
+        config['pretrained'] = str(pretrained_value)
+        config['checkpoint'] = int(checkpoint_value)
 
         # Save the modified YAML file
         with open(file_path, 'w') as file:
