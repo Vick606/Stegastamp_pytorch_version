@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timedelta
 
 CHECKPOINT_MARK_1 = 10_000
-CHECKPOINT_MARK_2 = 1500
+CHECKPOINT_MARK_2 = 15_000
 IMAGE_SIZE = 400
 
 def infoMessage0(string):
@@ -71,6 +71,8 @@ def main():
     total_steps = len(dataset) // args.batch_size + 1
     global_step = 0
 
+    chkpt = args.checkpoint
+
     if args.pretrained != "None":
         print(f"Resuming training from {args.pretrained}...")
         checkpoint = torch.load(args.pretrained)
@@ -108,7 +110,7 @@ def main():
             if args.cuda:
                 Ms = Ms.cuda()
 
-            # Ensure tensors are in full precision
+            # Ensure tensors are in full precision (float32)
             image_input = image_input.float()
             secret_input = secret_input.float()
             Ms = Ms.float()
@@ -165,23 +167,23 @@ def main():
                 print(f"Step: {global_step}, Time per Step: {step_time:.2f} seconds, ETA: {eta}, Loss = {loss:.4f}")
 
             if global_step % CHECKPOINT_MARK_1 == 0:
-                torch.save(encoder, os.path.join(args.saved_models, f"encoder_{global_step}.pth"))
-                torch.save(decoder, os.path.join(args.saved_models, f"decoder_{global_step}.pth"))
+                torch.save(encoder, os.path.join(args.saved_models, f"encoder_manual_save_{global_step+chkpt}.pth"))
+                torch.save(decoder, os.path.join(args.saved_models, f"decoder_manual_save_{global_step+chkpt}.pth"))
 
             if global_step % CHECKPOINT_MARK_2 == 0:
                 if loss < args.min_loss:
                     args.min_loss = loss
-                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_total_loss_{global_step}.pth"))
-                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_total_loss_{global_step}.pth"))
-            if global_step > CHECKPOINT_MARK_1:
+                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_total_loss_{global_step+chkpt}.pth"))
+                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_total_loss_{global_step+chkpt}.pth"))
+            if global_step % CHECKPOINT_MARK_1 == 0:
                 if secret_loss < args.min_secret_loss:
                     args.min_secret_loss = secret_loss
-                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_secret_loss_{global_step}.pth"))
-                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_secret_loss_{global_step}.pth"))
+                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_secret_loss_{global_step+chkpt}.pth"))
+                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_secret_loss_{global_step+chkpt}.pth"))
 
     writer.close()
-    torch.save(encoder, os.path.join(args.saved_models, f"encoder_{global_step}.pth"))
-    torch.save(decoder, os.path.join(args.saved_models, f"decoder_{global_step}.pth"))
+    torch.save(encoder, os.path.join(args.saved_models, f"encoder_{global_step+chkpt}.pth"))
+    torch.save(decoder, os.path.join(args.saved_models, f"decoder_{global_step+chkpt}.pth"))
 
 if __name__ == '__main__':
     main()
