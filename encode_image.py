@@ -35,7 +35,7 @@ def main():
     if args.cuda:
         encoder = encoder.cuda()
 
-    bch = bchlib.BCH(BCH_POLYNOMIAL, BCH_BITS)
+    bch = bchlib.BCH(prim_poly=BCH_POLYNOMIAL, t=BCH_BITS)
 
     if len(args.secret) > 7:
         print('Error: Can only encode 56bits (7 characters) with ECC')

@@ -8,3 +8,4 @@ easydict
 lpips
 opencv-python
 pyyaml
+bchlib

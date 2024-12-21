@@ -34,7 +34,7 @@ def main():
     if args.cuda:
         decoder = decoder.cuda()
 
-    bch = bchlib.BCH(BCH_POLYNOMIAL, BCH_BITS)
+    bch = bchlib.BCH(prim_poly=BCH_POLYNOMIAL, t=BCH_BITS)
 
     width = 400
     height = 400
@@ -63,7 +63,7 @@ def main():
 
             data, ecc = packet[:-bch.ecc_bytes], packet[-bch.ecc_bytes:]
 
-            bitflips = bch.decode_inplace(data, ecc)
+            bitflips = bch.decode(data, ecc)
 
             if bitflips != -1:
                 try:
