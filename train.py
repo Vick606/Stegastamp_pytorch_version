@@ -167,8 +167,8 @@ def main():
                 writer.add_scalar('Loss/Total', loss.item(), global_step)
                 writer.add_scalar('Loss/Secret', secret_loss.item(), global_step)
                 writer.add_scalar('Loss/Discriminator', D_loss.item(), global_step)
-
-            if global_step % 100 == 0:
+            # EDIT
+            if global_step % 1 == 0:
                 print(f"Step: {global_step}, Time per Step: {step_time:.2f} seconds, ETA: {eta}, Loss = {loss:.4f}")
 
             if global_step % CHECKPOINT_MARK_1 == 0:
