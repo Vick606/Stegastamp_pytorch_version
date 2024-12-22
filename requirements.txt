@@ -9,3 +9,6 @@ lpips
 opencv-python
 pyyaml
 bchlib
+matplotlib
+albumentations
+tqdm

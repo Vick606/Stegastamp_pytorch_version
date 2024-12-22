@@ -1,7 +1,7 @@
 /__pycache__/
 /logs/
 /images
-/saved_models
+/models
 /checkpoints
 *.png
 *.jpg

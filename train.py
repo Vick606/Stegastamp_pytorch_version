@@ -45,8 +45,8 @@ def main():
     dataset = StegaData(args.train_path, args.secret_size, size=(IMAGE_SIZE, IMAGE_SIZE))
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
-    encoder = model.StegaStampEncoder()
-    decoder = model.StegaStampDecoder(secret_size=args.secret_size)
+    encoder = model.StegaStampEncoderUnet()
+    decoder = model.StegaStampDecoderUnet(secret_size=args.secret_size)
     discriminator = model.Discriminator()
     lpips_alex = lpips.LPIPS(net="alex", verbose=False)
 
