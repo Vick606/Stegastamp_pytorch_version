@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 
 CHECKPOINT_MARK_1 = 10_000
 CHECKPOINT_MARK_2 = 15_000
+CHECKPOINT_MARK_3 = 1000
 IMAGE_SIZE = 400
 
 def infoMessage0(string):
@@ -45,8 +46,13 @@ def main():
     dataset = StegaData(args.train_path, args.secret_size, size=(IMAGE_SIZE, IMAGE_SIZE))
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
-    encoder = model.StegaStampEncoderUnet()
-    decoder = model.StegaStampDecoderUnet(secret_size=args.secret_size)
+    if args.UNet:
+        encoder = model.StegaStampEncoderUnet(color_space=args.color_space, KAN=args.KAN )
+        decoder = model.StegaStampDecoderUnet(color_space=args.color_space, KAN=args.KAN, secret_size=args.secret_size)
+    else:
+        encoder = model.StegaStampEncoder(color_space=args.color_space, KAN=args.KAN)
+        decoder = model.StegaStampDecoder(color_space=args.color_space, KAN=args.KAN, secret_size=args.secret_size)
+
     discriminator = model.Discriminator()
     lpips_alex = lpips.LPIPS(net="alex", verbose=False)
 
@@ -70,8 +76,6 @@ def main():
 
     total_steps = len(dataset) // args.batch_size + 1
     global_step = 0
-
-    chkpt = args.checkpoint
 
     if args.pretrained != "None":
         print(f"Resuming training from {args.pretrained}...")
@@ -163,27 +167,28 @@ def main():
                 writer.add_scalar('Loss/Total', loss.item(), global_step)
                 writer.add_scalar('Loss/Secret', secret_loss.item(), global_step)
                 writer.add_scalar('Loss/Discriminator', D_loss.item(), global_step)
+
             if global_step % 100 == 0:
                 print(f"Step: {global_step}, Time per Step: {step_time:.2f} seconds, ETA: {eta}, Loss = {loss:.4f}")
 
             if global_step % CHECKPOINT_MARK_1 == 0:
-                torch.save(encoder, os.path.join(args.saved_models, f"encoder_manual_save_{global_step+chkpt}.pth"))
-                torch.save(decoder, os.path.join(args.saved_models, f"decoder_manual_save_{global_step+chkpt}.pth"))
+                torch.save(encoder, os.path.join(args.saved_models, "manual_save", f"{global_step}_encoder_manual_save.pth"))
+                torch.save(decoder, os.path.join(args.saved_models, "manual_save", f"{global_step}_decoder_manual_save.pth"))
 
             if global_step % CHECKPOINT_MARK_2 == 0:
                 if loss < args.min_loss:
                     args.min_loss = loss
-                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_total_loss_{global_step+chkpt}.pth"))
-                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_total_loss_{global_step+chkpt}.pth"))
-            if global_step % CHECKPOINT_MARK_1 == 0:
+                    torch.save(encoder, os.path.join(args.checkpoints_path, "best_total_loss", f"{global_step}_encoder_best_total_loss.pth"))
+                    torch.save(decoder, os.path.join(args.checkpoints_path, "best_total_loss", f"{global_step}_decoder_best_total_loss.pth"))
+            if global_step % CHECKPOINT_MARK_3 == 0:
                 if secret_loss < args.min_secret_loss:
                     args.min_secret_loss = secret_loss
-                    torch.save(encoder, os.path.join(args.checkpoints_path, f"encoder_best_secret_loss_{global_step+chkpt}.pth"))
-                    torch.save(decoder, os.path.join(args.checkpoints_path, f"decoder_best_secret_loss_{global_step+chkpt}.pth"))
+                    torch.save(encoder, os.path.join(args.checkpoints_path, "best_secret_loss", f"{global_step}_encoder_best_secret_loss.pth"))
+                    torch.save(decoder, os.path.join(args.checkpoints_path, "best_secret_loss", f"{global_step}_decoder_best_secret_loss.pth"))
 
     writer.close()
-    torch.save(encoder, os.path.join(args.saved_models, f"encoder_{global_step+chkpt}.pth"))
-    torch.save(decoder, os.path.join(args.saved_models, f"decoder_{global_step+chkpt}.pth"))
+    torch.save(encoder, os.path.join(args.saved_models, f"{global_step}_encoder.pth"))
+    torch.save(decoder, os.path.join(args.saved_models, f"{global_step}_decoder.pth"))
 
 if __name__ == '__main__':
     main()

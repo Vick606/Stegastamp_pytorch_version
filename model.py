@@ -10,9 +10,41 @@ from kornia import color
 import torch.nn.functional as F
 import warnings
 warnings.filterwarnings('ignore')
-# import unet_parts as UNet
 from torchvision import transforms
 
+# Functions to handle color spaces
+def convert_to_colorspace(image, color_space):
+    """Convert RGB image to specified color space"""
+    if color_space == 'RGB':
+        return image
+    elif color_space == 'HSI':
+        return color.rgb_to_hsi(image)
+    elif color_space == 'CMYK':
+        # Convert RGB [0,1] to CMYK
+        r, g, b = image[:, 0], image[:, 1], image[:, 2]
+        k = 1 - torch.max(image, dim=1)[0]
+        c = (1 - r - k) / (1 - k + 1e-8)
+        m = (1 - g - k) / (1 - k + 1e-8)
+        y = (1 - b - k) / (1 - k + 1e-8)
+        return torch.stack([c, m, y, k], dim=1)
+    else:
+        raise ValueError(f"Unsupported color space: {color_space}")
+    
+def convert_from_colorspace(image, color_space):
+    """Convert from specified color space back to RGB"""
+    if color_space == 'RGB':
+        return image
+    elif color_space == 'HSI':
+        return color.hsi_to_rgb(image)
+    elif color_space == 'CMYK':
+        # Convert CMYK back to RGB [0,1]
+        c, m, y, k = image[:, 0], image[:, 1], image[:, 2], image[:, 3]
+        r = (1 - c) * (1 - k)
+        g = (1 - m) * (1 - k)
+        b = (1 - y) * (1 - k)
+        return torch.stack([r, g, b], dim=1)
+    else:
+        raise ValueError(f"Unsupported color space: {color_space}")
 
 class Dense(nn.Module):
     def __init__(self, in_features, out_features, activation='relu', kernel_initializer='he_normal'):
@@ -69,11 +101,15 @@ class Flatten(nn.Module):
 
 
 class StegaStampEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, color_space='RGB', KAN=False):  # CHANGE 2: Added color_space parameter
         super(StegaStampEncoder, self).__init__()
+
+        self.color_space = color_space
+        input_channels = 4 if color_space == 'CMYK' else 3
+
         self.secret_dense = Dense(100, 7500, activation='relu', kernel_initializer='he_normal')
 
-        self.conv1 = Conv2D(6, 32, 3, activation='relu')
+        self.conv1 = Conv2D(input_channels + 3, 32, 3, activation='relu')
         self.conv2 = Conv2D(32, 32, 3, activation='relu', strides=2)
         self.conv3 = Conv2D(32, 64, 3, activation='relu', strides=2)
         self.conv4 = Conv2D(64, 128, 3, activation='relu', strides=2)
@@ -91,13 +127,16 @@ class StegaStampEncoder(nn.Module):
     def forward(self, inputs):
         secrect, image = inputs
         secrect = secrect - .5
-        image = image - .5
-        # image is between [-0.5,0.5]
+
+        image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image_converted - .5
+        
         secrect = self.secret_dense(secrect)
         secrect = secrect.reshape(-1, 3, 50, 50)
         secrect_enlarged = nn.Upsample(scale_factor=(8, 8))(secrect)
 
-        inputs = torch.cat([secrect_enlarged, image], dim=1)
+        inputs = torch.cat([secrect_enlarged, image_converted], dim=1)
+
         conv1 = self.conv1(inputs)
         conv2 = self.conv2(conv1)
         conv3 = self.conv3(conv2)
@@ -116,16 +155,29 @@ class StegaStampEncoder(nn.Module):
         merge9 = torch.cat([conv1, up9, inputs], dim=1)
         conv9 = self.conv9(merge9)
         residual = self.residual(conv9)
+
+        
+        residual = convert_from_colorspace(residual, self.color_space)
+
         return residual
 
 
 class StegaStampEncoderUnet(nn.Module):
-    def __init__(self, bilinear=False):
+    def __init__(self, color_space='RGB', KAN=False, bilinear=False):
         super(StegaStampEncoderUnet, self).__init__()
+
+        if KAN:
+            import kan_unet_parts as UNet
+        else:
+            import unet_parts as UNet
+
+        self.color_space = color_space
+        input_channels = 4 if color_space == 'CMYK' else 3
+
         self.secret_dense = Dense(100, 7500, activation='relu', kernel_initializer='he_normal')
 
-        self.conv1 = nn.Conv2d(6, 6, 3, padding=8)
-        self.inc = (UNet.DoubleConv(6, 64))
+        self.conv1 = nn.Conv2d(input_channels + 3, input_channels + 3, 3, padding=8)
+        self.inc = (UNet.DoubleConv(input_channels+3, 64))
         self.down1 = (UNet.Down(64, 128))
         self.down2 = (UNet.Down(128, 256))
         self.DoubleConv = (UNet.DoubleConv(256, 512))
@@ -133,21 +185,23 @@ class StegaStampEncoderUnet(nn.Module):
         self.up1 = (UNet.Up(512, 256 // factor, bilinear))
         self.up2 = (UNet.Up(256, 128 // factor, bilinear))
         self.up3 = (UNet.Up(128, 64 // factor, bilinear))
-        self.outc = (UNet.OutConv(64, 6))
-        self.conv2 = nn.Conv2d(6, 3, 15, padding=0)
+        self.outc = (UNet.OutConv(64, input_channels))
+        self.conv2 = nn.Conv2d(input_channels, 3, 15, padding=0)
         self.sig = nn.Sigmoid()
 
     def forward(self, inputs):
         secrect, image = inputs
         secrect = secrect - .5
-        image = image - .5
+        
+        image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image_converted - .5
 
         secrect = self.secret_dense(secrect)
         secrect = secrect.reshape(-1, 3, 50, 50)
-        image = nn.functional.interpolate(image, scale_factor=(1/8, 1/8))
+        image_converted = nn.functional.interpolate(image_converted, scale_factor=(1/8, 1/8))
         # secrect_enlarged = nn.Upsample(scale_factor=(8, 8))(secrect)
 
-        inputs = torch.cat([secrect, image], dim=1)
+        inputs = torch.cat([secrect, image_converted], dim=1)
         conv1 = self.conv1(inputs)
         x1 = self.inc(conv1)
         x2 = self.down1(x1)
@@ -161,6 +215,9 @@ class StegaStampEncoderUnet(nn.Module):
 
         secrect_enlarged = nn.Upsample(scale_factor=(8, 8))(x)
         secrect_enlarged = self.sig(secrect_enlarged)
+
+        secret_enlarged = convert_from_colorspace(secret_enlarged, self.color_space)
+
         return secrect_enlarged
 
 
@@ -187,8 +244,9 @@ class SpatialTransformerNetwork(nn.Module):
 
 
 class StegaStampDecoder(nn.Module):
-    def __init__(self, secret_size=100):
+    def __init__(self, color_space='RGB', KAN=False, secret_size=100):
         super(StegaStampDecoder, self).__init__()
+        self.color_space = color_space
         self.secret_size = secret_size
         self.stn = SpatialTransformerNetwork()
         self.decoder = nn.Sequential(
@@ -204,14 +262,17 @@ class StegaStampDecoder(nn.Module):
             Dense(512, secret_size, activation=None))
 
     def forward(self, image):
-        image = image - .5
-        transformed_image = self.stn(image)
+        image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image_converted - .5
+        transformed_image = self.stn(image_converted)
+        
         return torch.sigmoid(self.decoder(transformed_image))
 
 
 class StegaStampDecoderUnet(nn.Module):
-    def __init__(self, secret_size=100):
+    def __init__(self, color_space='RGB', KAN=False, secret_size=100):
         super(StegaStampDecoderUnet, self).__init__()
+        self.color_space = color_space
         self.secret_size = secret_size
         self.stn = SpatialTransformerNetwork()
         self.decoder = nn.Sequential(
@@ -227,8 +288,10 @@ class StegaStampDecoderUnet(nn.Module):
             Dense(512, secret_size, activation=None))
 
     def forward(self, image):
-        image = image - .5
-        transformed_image = self.stn(image)
+        image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image_converted - .5
+        transformed_image = self.stn(image_converted)
+        
         return torch.sigmoid(self.decoder(transformed_image))
 
 
