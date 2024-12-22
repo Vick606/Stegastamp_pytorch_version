@@ -56,7 +56,7 @@ min_loss: 1_000 # set high value so it won't be saved.
 min_secret_loss: 1_000 # set high value so it won't be saved.
 seed: 18
 
-pretrained: "None"
+pretrained: False
 KAN : False
 UNet : False
 color_space : "RGB" # choices=['RGB','HSI','CMYK']

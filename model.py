@@ -12,7 +12,7 @@ import warnings
 warnings.filterwarnings('ignore')
 from torchvision import transforms
 
-# Functions to handle color spaces
+
 def convert_to_colorspace(image, color_space):
     """Convert RGB image to specified color space"""
     if color_space == 'RGB':
@@ -30,6 +30,7 @@ def convert_to_colorspace(image, color_space):
     else:
         raise ValueError(f"Unsupported color space: {color_space}")
     
+
 def convert_from_colorspace(image, color_space):
     """Convert from specified color space back to RGB"""
     if color_space == 'RGB':
@@ -45,6 +46,7 @@ def convert_from_colorspace(image, color_space):
         return torch.stack([r, g, b], dim=1)
     else:
         raise ValueError(f"Unsupported color space: {color_space}")
+
 
 class Dense(nn.Module):
     def __init__(self, in_features, out_features, activation='relu', kernel_initializer='he_normal'):
@@ -98,6 +100,35 @@ class Flatten(nn.Module):
 
     def forward(self, input):
         return input.view(input.size(0), -1)
+
+
+class SpatialTransformerNetwork(nn.Module):
+    def __init__(self, color_space='RGB'):  # Added color_space parameter
+        super(SpatialTransformerNetwork, self).__init__()
+        # Determine input channels based on color space
+        input_channels = 4 if color_space == 'CMYK' else 3
+        
+        self.localization = nn.Sequential(
+            Conv2D(input_channels, 32, 3, strides=2, activation='relu'),  # Modified input channels
+            Conv2D(32, 64, 3, strides=2, activation='relu'),
+            Conv2D(64, 128, 3, strides=2, activation='relu'),
+            Flatten(),
+            Dense(320000, 128, activation='relu'),
+            nn.Linear(128, 6)
+        )
+        self.localization[-1].weight.data.fill_(0)
+        self.localization[-1].bias.data = torch.FloatTensor([1, 0, 0, 0, 1, 0])
+        self.color_space = color_space
+
+    def forward(self, image):
+        image_converted = convert_to_colorspace(image, self.color_space)
+        theta = self.localization(image_converted)
+        theta = theta.view(-1, 2, 3)
+        grid = F.affine_grid(theta, image.size(), align_corners=False)
+        transformed_image = F.grid_sample(image_converted, grid, align_corners=False)
+        
+        transformed_image = convert_from_colorspace(transformed_image, self.color_space)
+        return transformed_image
 
 
 class StegaStampEncoder(nn.Module):
@@ -221,36 +252,16 @@ class StegaStampEncoderUnet(nn.Module):
         return secrect_enlarged
 
 
-class SpatialTransformerNetwork(nn.Module):
-    def __init__(self):
-        super(SpatialTransformerNetwork, self).__init__()
-        self.localization = nn.Sequential(
-            Conv2D(3, 32, 3, strides=2, activation='relu'),
-            Conv2D(32, 64, 3, strides=2, activation='relu'),
-            Conv2D(64, 128, 3, strides=2, activation='relu'),
-            Flatten(),
-            Dense(320000, 128, activation='relu'),
-            nn.Linear(128, 6)
-        )
-        self.localization[-1].weight.data.fill_(0)
-        self.localization[-1].bias.data = torch.FloatTensor([1, 0, 0, 0, 1, 0])
-
-    def forward(self, image):
-        theta = self.localization(image)
-        theta = theta.view(-1, 2, 3)
-        grid = F.affine_grid(theta, image.size(), align_corners=False)
-        transformed_image = F.grid_sample(image, grid, align_corners=False)
-        return transformed_image
-
-
 class StegaStampDecoder(nn.Module):
     def __init__(self, color_space='RGB', KAN=False, secret_size=100):
         super(StegaStampDecoder, self).__init__()
-        self.color_space = color_space
         self.secret_size = secret_size
-        self.stn = SpatialTransformerNetwork()
+        self.color_space = color_space
+        input_channels = 4 if color_space == 'CMYK' else 3
+        
+        self.stn = SpatialTransformerNetwork(color_space=color_space)
         self.decoder = nn.Sequential(
-            Conv2D(3, 32, 3, strides=2, activation='relu'),
+            Conv2D(input_channels, 32, 3, strides=2, activation='relu'),  # Modified input channels
             Conv2D(32, 32, 3, activation='relu'),
             Conv2D(32, 64, 3, strides=2, activation='relu'),
             Conv2D(64, 64, 3, activation='relu'),
@@ -270,29 +281,63 @@ class StegaStampDecoder(nn.Module):
 
 
 class StegaStampDecoderUnet(nn.Module):
-    def __init__(self, color_space='RGB', KAN=False, secret_size=100):
+    def __init__(self, color_space='RGB', KAN=False, secret_size=100, bilinear=False):
         super(StegaStampDecoderUnet, self).__init__()
-        self.color_space = color_space
         self.secret_size = secret_size
-        self.stn = SpatialTransformerNetwork()
-        self.decoder = nn.Sequential(
-            Conv2D(3, 32, 3, strides=2, activation='relu'),
-            Conv2D(32, 32, 3, activation='relu'),
-            Conv2D(32, 64, 3, strides=2, activation='relu'),
-            Conv2D(64, 64, 3, activation='relu'),
-            Conv2D(64, 64, 3, strides=2, activation='relu'),
-            Conv2D(64, 128, 3, strides=2, activation='relu'),
-            Conv2D(128, 128, 3, strides=2, activation='relu'),
-            Flatten(),
-            Dense(21632, 512, activation='relu'),
-            Dense(512, secret_size, activation=None))
+        self.color_space = color_space
+        input_channels = 4 if color_space == 'CMYK' else 3
+
+        if KAN:
+            import kan_unet_parts as UNet
+        else:
+            import unet_parts as UNet
+        
+        self.stn = SpatialTransformerNetwork(color_space=color_space)
+        
+        self.conv1 = nn.Conv2d(input_channels, input_channels, 3, padding=8)
+        
+        self.inc = UNet.DoubleConv(input_channels, 64)
+        self.down1 = UNet.Down(64, 128)
+        self.down2 = UNet.Down(128, 256)
+        self.DoubleConv = UNet.DoubleConv(256, 512)
+        
+        factor = 2 if bilinear else 1
+        self.up1 = UNet.Up(512, 256 // factor, bilinear)
+        self.up2 = UNet.Up(256, 128 // factor, bilinear)
+        self.up3 = UNet.Up(128, 64 // factor, bilinear)
+        
+        self.outc = UNet.OutConv(64, 32)
+        
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(32 * 400 * 400, 512) 
+        self.fc2 = nn.Linear(512, secret_size)
+        
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, image):
         image_converted = convert_to_colorspace(image, self.color_space)
         image_converted = image_converted - .5
+        
         transformed_image = self.stn(image_converted)
         
-        return torch.sigmoid(self.decoder(transformed_image))
+        x = self.conv1(transformed_image)
+        
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.DoubleConv(x3)
+        
+        x = self.up1(x4, x3)
+        x = self.up2(x, x2)
+        x = self.up3(x, x1)
+        x = self.outc(x)
+        
+        x = self.flatten(x)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        
+        return self.sigmoid(x)
 
 
 class Discriminator(nn.Module):
