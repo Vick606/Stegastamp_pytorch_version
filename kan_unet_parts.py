@@ -13,7 +13,7 @@ from fastkanconv import FastKANConvLayer
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, device):
+    def __init__(self, in_channels, out_channels, device="cuda"):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -34,7 +34,7 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels, device='mps'):
+    def __init__(self, in_channels, out_channels, device='cuda'):
         super().__init__()
         self.device = device
         self.maxpool_conv = nn.Sequential(
@@ -48,7 +48,7 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True, device='mps'):
+    def __init__(self, in_channels, out_channels, bilinear=True, device='cuda'):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
@@ -79,7 +79,7 @@ class OutConv(nn.Module):
         return self.conv(x)
 
 class KANU_Net(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True, device='mps'):
+    def __init__(self, n_channels, n_classes, bilinear=True, device='cuda'):
         super(KANU_Net, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
