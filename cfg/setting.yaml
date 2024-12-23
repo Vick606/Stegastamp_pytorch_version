@@ -46,7 +46,7 @@ saved_models: ./models/
 secret_loss_ramp: 1
 secret_loss_scale: 2.5
 secret_size: 100
-seed: 3526
+seed: 18
 train_path: /kaggle/input/mirflickr-1m/
 u_scale: 100
 v_scale: 100
