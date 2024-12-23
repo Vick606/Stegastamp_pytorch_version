@@ -135,7 +135,7 @@ class SpatialTransformerNetwork(nn.Module):
         self.color_space = color_space
 
     def forward(self, image):
-        image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image
         theta = self.localization(image_converted)
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, image.size(), align_corners=False)
@@ -148,7 +148,7 @@ class SpatialTransformerNetwork(nn.Module):
 class StegaStampEncoder(nn.Module):
     def __init__(
         self, color_space="RGB", KAN=False
-    ):  # CHANGE 2: Added color_space parameter
+    ):
         super(StegaStampEncoder, self).__init__()
 
         self.color_space = color_space
