@@ -103,6 +103,11 @@ def main():
         args.min_loss = checkpoint["min_loss"]
         args.min_secret_loss = checkpoint["min_secret_loss"]
 
+    os.mkdir(os.path.join(args.checkpoints_path, "best_total_loss"))
+    os.mkdir(os.path.join(args.checkpoints_path, "best_secret_loss"))
+    os.mkdir(os.path.join(args.checkpoints_path, "last_timeout"))
+    os.mkdir(os.path.join(args.checkpoints_path, "manual_save"))
+
     MAX_TRAINING_TIME = 10 * 60 * 60  # 10 hours in seconds
 
     start_time = time.time()
@@ -202,7 +207,7 @@ def main():
                         "min_secret_loss": args.min_secret_loss,
                     },
                     os.path.join(
-                        args.checkpoints_path, f"checkpoint_step_{global_step}.pth"
+                        args.checkpoints_path, "last_timeout", f"{global_step}_checkpoint_timeout.pth"
                     ),
                 )
                 exit(0)
@@ -221,7 +226,7 @@ def main():
                 torch.save(
                     encoder,
                     os.path.join(
-                        args.saved_models,
+                        args.checkpoints_path,
                         "manual_save",
                         f"{global_step}_encoder_manual_save.pth",
                     ),
@@ -229,7 +234,7 @@ def main():
                 torch.save(
                     decoder,
                     os.path.join(
-                        args.saved_models,
+                        args.checkpoints_path,
                         "manual_save",
                         f"{global_step}_decoder_manual_save.pth",
                     ),
