@@ -27,7 +27,7 @@ lpips_loss_scale: 1.5
 lr: 0.0001
 min_loss: 1000
 min_secret_loss: 1000
-no_gan: false
+no_gan: true
 no_im_loss_steps: 1500
 no_jpeg: true
 num_steps: 90000
