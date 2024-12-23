@@ -7,11 +7,13 @@ KAN_value = settings.get('KAN', None)
 pretrained_value = settings.get('pretrained', None)
 UNet_value = settings.get('UNet', None)
 color_space_value = settings.get('color_space', None)
+num_steps_value = settings.get('num_steps', None)
 
-print("KAN:", KAN_value)
-print("pretrained:", pretrained_value)
-print("UNet:", UNet_value)
-print("color_space:", color_space_value)
+print("KAN : ", KAN_value)
+print("pretrained : ", pretrained_value)
+print("UNet : ", UNet_value)
+print("color_space : ", color_space_value)
+print("num_steps : ", num_steps_value)
 
 print()
 

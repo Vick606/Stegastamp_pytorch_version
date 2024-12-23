@@ -33,7 +33,7 @@ hsv_h_scale: 1
 hsv_s_scale: 1
 hsv_v_scale: 5
 
-no_gan: True
+no_gan: False
 rnd_trans: 0.1
 rnd_bri: 0.3
 rnd_noise: 0.02
