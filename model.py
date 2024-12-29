@@ -141,7 +141,7 @@ class SpatialTransformerNetwork(nn.Module):
         grid = F.affine_grid(theta, image.size(), align_corners=False)
         transformed_image = F.grid_sample(image_converted, grid, align_corners=False)
 
-        transformed_image = convert_from_colorspace(transformed_image, self.color_space)
+        # transformed_image = convert_from_colorspace(transformed_image, self.color_space)
         return transformed_image
 
 
@@ -205,9 +205,39 @@ class StegaStampEncoder(nn.Module):
         conv9 = self.conv9(merge9)
         residual = self.residual(conv9)
 
-        residual = convert_from_colorspace(residual, self.color_space)
+        # residual = convert_from_colorspace(residual, self.color_space)
 
         return residual
+
+
+class StegaStampDecoder(nn.Module):
+    def __init__(self, color_space="RGB", KAN=False, secret_size=100):
+        super(StegaStampDecoder, self).__init__()
+        self.secret_size = secret_size
+        self.color_space = color_space
+        input_channels = 4 if color_space == "CMYK" else 3
+
+        self.stn = SpatialTransformerNetwork(color_space=color_space)
+        self.decoder = nn.Sequential(
+            Conv2D(3, 32, 3, strides=2, activation="relu"),  # Modified input channels
+            Conv2D(32, 32, 3, activation="relu"),
+            Conv2D(32, 64, 3, strides=2, activation="relu"),
+            Conv2D(64, 64, 3, activation="relu"),
+            Conv2D(64, 64, 3, strides=2, activation="relu"),
+            Conv2D(64, 128, 3, strides=2, activation="relu"),
+            Conv2D(128, 128, 3, strides=2, activation="relu"),
+            Flatten(),
+            Dense(21632, 512, activation="relu"),
+            Dense(512, secret_size, activation=None),
+        )
+
+    def forward(self, image):
+        # image_converted = convert_to_colorspace(image, self.color_space)
+        image_converted = image
+        image_converted = image_converted - 0.5
+        transformed_image = self.stn(image_converted)
+
+        return convert_to_colorspace(torch.sigmoid(self.decoder(transformed_image)), self.color_space)
 
 
 class StegaStampEncoderUnet(nn.Module):
@@ -271,35 +301,6 @@ class StegaStampEncoderUnet(nn.Module):
         secret_enlarged = convert_from_colorspace(secret_enlarged, self.color_space)
 
         return secret_enlarged
-
-
-class StegaStampDecoder(nn.Module):
-    def __init__(self, color_space="RGB", KAN=False, secret_size=100):
-        super(StegaStampDecoder, self).__init__()
-        self.secret_size = secret_size
-        self.color_space = color_space
-        input_channels = 4 if color_space == "CMYK" else 3
-
-        self.stn = SpatialTransformerNetwork(color_space=color_space)
-        self.decoder = nn.Sequential(
-            Conv2D(3, 32, 3, strides=2, activation="relu"),  # Modified input channels
-            Conv2D(32, 32, 3, activation="relu"),
-            Conv2D(32, 64, 3, strides=2, activation="relu"),
-            Conv2D(64, 64, 3, activation="relu"),
-            Conv2D(64, 64, 3, strides=2, activation="relu"),
-            Conv2D(64, 128, 3, strides=2, activation="relu"),
-            Conv2D(128, 128, 3, strides=2, activation="relu"),
-            Flatten(),
-            Dense(21632, 512, activation="relu"),
-            Dense(512, secret_size, activation=None),
-        )
-
-    def forward(self, image):
-        image_converted = convert_to_colorspace(image, self.color_space)
-        image_converted = image_converted - 0.5
-        transformed_image = self.stn(image_converted)
-
-        return torch.sigmoid(self.decoder(transformed_image))
 
 
 class StegaStampDecoderUnet(nn.Module):
