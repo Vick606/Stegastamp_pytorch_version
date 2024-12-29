@@ -316,7 +316,7 @@ class StegaStampDecoderUnet(nn.Module):
 
         self.stn = SpatialTransformerNetwork(color_space=color_space)
         self.decoder = nn.Sequential(
-            Conv2D(3, 32, 3, strides=2, activation="relu"),  # Modified input channels
+            Conv2D(input_channels, 32, 3, strides=2, activation="relu"),  # Modified input channels
             Conv2D(32, 32, 3, activation="relu"),
             Conv2D(32, 64, 3, strides=2, activation="relu"),
             Conv2D(64, 64, 3, activation="relu"),
@@ -332,6 +332,9 @@ class StegaStampDecoderUnet(nn.Module):
         image_converted = convert_to_colorspace(image, self.color_space)
         image_converted = image_converted - 0.5
         transformed_image = self.stn(image_converted)
+        transformed_image = transform_image + 0.5
+
+        transformed_image = convert_from_colorspace(transformed_image, self.color_space)
 
         return torch.sigmoid(self.decoder(transformed_image))
 
