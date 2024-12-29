@@ -410,22 +410,22 @@ def transform_net(encoded_image, args, global_step):
     encoded_image = encoded_image * contrast_scale
     encoded_image = encoded_image + rnd_brightness
     encoded_image = torch.clamp(encoded_image, 0, 1)
+    
+    # saturation
+    sat_weight = torch.FloatTensor([0.3, 0.6, 0.1]).reshape(1, 3, 1, 1)
+    if args.cuda:
+        sat_weight = sat_weight.cuda()
+    encoded_image_lum = torch.mean(encoded_image * sat_weight, dim=1).unsqueeze_(1)
+    encoded_image = (1 - rnd_sat) * encoded_image + rnd_sat * encoded_image_lum
 
-# saturation
-sat_weight = torch.FloatTensor([0.3, 0.6, 0.1]).reshape(1, 3, 1, 1)
-if args.cuda:
-    sat_weight = sat_weight.cuda()
-encoded_image_lum = torch.mean(encoded_image * sat_weight, dim=1).unsqueeze_(1)
-encoded_image = (1 - rnd_sat) * encoded_image + rnd_sat * encoded_image_lum
+    # jpeg
+    encoded_image = encoded_image.reshape([-1, 3, 400, 400])
+    if not args.no_jpeg:
+        encoded_image = utils.jpeg_compress_decompress(
+            encoded_image, rounding=utils.round_only_at_0, quality=jpeg_quality
+        )
 
-# jpeg
-encoded_image = encoded_image.reshape([-1, 3, 400, 400])
-if not args.no_jpeg:
-    encoded_image = utils.jpeg_compress_decompress(
-        encoded_image, rounding=utils.round_only_at_0, quality=jpeg_quality
-    )
-
-return encoded_image
+    return encoded_image  
 
 
 def get_secret_acc(secret_true, secret_pred):
