@@ -332,7 +332,7 @@ class StegaStampDecoderUnet(nn.Module):
         image_converted = convert_to_colorspace(image, self.color_space)
         image_converted = image_converted - 0.5
         transformed_image = self.stn(image_converted)
-        transformed_image = transform_image + 0.5
+        transformed_image = transformed_image + 0.5
 
         transformed_image = convert_from_colorspace(transformed_image, self.color_space)
 
