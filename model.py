@@ -427,8 +427,8 @@ def transform_net(encoded_image, args, global_step):
 
     return encoded_image
 
-    def get_secret_acc(secret_true, secret_pred):
-     if "cuda" in str(secret_pred.device):
+def get_secret_acc(secret_true, secret_pred):
+    if "cuda" in str(secret_pred.device):
         secret_pred = secret_pred.cpu()
         secret_true = secret_true.cpu()
     secret_pred = torch.round(secret_pred)
