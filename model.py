@@ -425,10 +425,9 @@ def transform_net(encoded_image, args, global_step):
             encoded_image, rounding=utils.round_only_at_0, quality=jpeg_quality
         )
 
-    return encoded_image  
+    return encoded_image
 
-
-def get_secret_acc(secret_true, secret_pred):
+    def get_secret_acc(secret_true, secret_pred):
     if "cuda" in str(secret_pred.device):
         secret_pred = secret_pred.cpu()
         secret_true = secret_true.cpu()
@@ -478,148 +477,149 @@ def build_model(
     residual = torchgeometry.warp_perspective(
         residual_warped, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
     )
-if borders == "no_edge":
-    encoded_image = image_input + residual
-elif borders == "black":
-    encoded_image = residual_warped + input_warped
-    encoded_image = torchgeometry.warp_perspective(
-        encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    input_unwarped = torchgeometry.warp_perspective(
-        image_input, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-elif borders.startswith("random"):
-    mask = torchgeometry.warp_perspective(
-        torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    encoded_image = residual_warped + input_unwarped
-    encoded_image = torchgeometry.warp_perspective(
-        encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    input_unwarped = torchgeometry.warp_perspective(
-        input_warped, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-elif borders == "white":
-    mask = torchgeometry.warp_perspective(
-        torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    encoded_image = residual_warped + input_warped
-    encoded_image = torchgeometry.warp_perspective(
-        encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    input_unwarped = torchgeometry.warp_perspective(
-        input_warped, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-elif borders == "image":
-    mask = torchgeometry.warp_perspective(
-        torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    encoded_image = residual_warped + input_warped
-    encoded_image = torchgeometry.warp_perspective(
-        encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
-    )
-    encoded_image += (1 - mask) * torch.roll(image_input, 1, 0)
 
-if borders == "no_edge":
-    D_output_real, _ = discriminator(image_input)
-    D_output_fake, D_heatmap = discriminator(encoded_image)
-else:
-    D_output_real, _ = discriminator(input_warped)
-    D_output_fake, D_heatmap = discriminator(encoded_warped)
-
-transformed_image = transform_net(encoded_image, args, global_step)
-decoded_secret = decoder(transformed_image)
-bit_acc, str_acc = get_secret_acc(secret_input, decoded_secret)
-
-normalized_input = image_input * 2 - 1
-normalized_encoded = encoded_image * 2 - 1
-lpips_loss = torch.mean(lpips_fn(normalized_input, normalized_encoded))
-
-cross_entropy = nn.BCELoss()
-if args.cuda:
-    cross_entropy = cross_entropy.cuda()
-secret_loss = cross_entropy(decoded_secret, secret_input)
-decipher_indicator = 0
-if (
-    torch.sum(
-        torch.sum(
-            torch.round(decoded_secret[:, :96]) == secret_input[:, :96], axis=1
+    if borders == "no_edge":
+        encoded_image = image_input + residual
+    elif borders == "black":
+        encoded_image = residual_warped + input_warped
+        encoded_image = torchgeometry.warp_perspective(
+            encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
         )
-        / 96
-        >= 0.7
-    )
-    > 0
-):
-    decipher_indicator = torch.sum(
-        torch.sum(
-            torch.round(decoded_secret[:, :96]) == secret_input[:, :96], axis=1
+        input_unwarped = torchgeometry.warp_perspective(
+            image_input, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
         )
-        / 96
-        >= 0.7
+    elif borders.startswith("random"):
+        mask = torchgeometry.warp_perspective(
+            torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        encoded_image = residual_warped + input_unwarped
+        encoded_image = torchgeometry.warp_perspective(
+            encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        input_unwarped = torchgeometry.warp_perspective(
+            input_warped, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+    elif borders == "white":
+        mask = torchgeometry.warp_perspective(
+            torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        encoded_image = residual_warped + input_warped
+        encoded_image = torchgeometry.warp_perspective(
+            encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        input_unwarped = torchgeometry.warp_perspective(
+            input_warped, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+    elif borders == "image":
+        mask = torchgeometry.warp_perspective(
+            torch.ones_like(residual), M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        encoded_image = residual_warped + input_warped
+        encoded_image = torchgeometry.warp_perspective(
+            encoded_image, M[:, 0, :, :], dsize=(400, 400), flags="bilinear"
+        )
+        encoded_image += (1 - mask) * torch.roll(image_input, 1, 0)
+
+    if borders == "no_edge":
+        D_output_real, _ = discriminator(image_input)
+        D_output_fake, D_heatmap = discriminator(encoded_image)
+    else:
+        D_output_real, _ = discriminator(input_warped)
+        D_output_fake, D_heatmap = discriminator(encoded_warped)
+
+    transformed_image = transform_net(encoded_image, args, global_step)
+    decoded_secret = decoder(transformed_image)
+    bit_acc, str_acc = get_secret_acc(secret_input, decoded_secret)
+
+    normalized_input = image_input * 2 - 1
+    normalized_encoded = encoded_image * 2 - 1
+    lpips_loss = torch.mean(lpips_fn(normalized_input, normalized_encoded))
+
+    cross_entropy = nn.BCELoss()
+    if args.cuda:
+        cross_entropy = cross_entropy.cuda()
+    secret_loss = cross_entropy(decoded_secret, secret_input)
+    decipher_indicator = 0
+    if (
+        torch.sum(
+            torch.sum(
+                torch.round(decoded_secret[:, :96]) == secret_input[:, :96], axis=1
+            )
+            / 96
+            >= 0.7
+        )
+        > 0
+    ):
+        decipher_indicator = torch.sum(
+            torch.sum(
+                torch.round(decoded_secret[:, :96]) == secret_input[:, :96], axis=1
+            )
+            / 96
+            >= 0.7
+        )
+
+    size = (int(image_input.shape[2]), int(image_input.shape[3]))
+    gain = 10
+    falloff_speed = 4
+    falloff_im = np.ones(size)
+    for i in range(int(falloff_im.shape[0] / falloff_speed)):  # for i in range 100
+        falloff_im[-i, :] *= (
+            np.cos(4 * np.pi * i / size[0] + np.pi) + 1
+        ) / 2  # [cos[(4*pi*i/400)+pi] + 1]/2
+        falloff_im[i, :] *= (
+            np.cos(4 * np.pi * i / size[0] + np.pi) + 1
+        ) / 2  # [cos[(4*pi*i/400)+pi] + 1]/2
+    for j in range(int(falloff_im.shape[1] / falloff_speed)):
+        falloff_im[:, -j] *= (np.cos(4 * np.pi * j / size[0] + np.pi) + 1) / 2
+        falloff_im[:, j] *= (np.cos(4 * np.pi * j / size[0] + np.pi) + 1) / 2
+    falloff_im = 1 - falloff_im
+    falloff_im = torch.from_numpy(falloff_im).float()
+    if args.cuda:
+        falloff_im = falloff_im.cuda()
+    falloff_im *= l2_edge_gain
+
+    encoded_image_yuv = color.rgb_to_yuv(encoded_image)
+    avg_encoded = torch.mean(encoded_image_yuv)
+    max_encoded = torch.max(encoded_image_yuv)
+    image_input_yuv = color.rgb_to_yuv(image_input)
+    avg_image = torch.mean(image_input_yuv)
+    max_image = torch.max(image_input_yuv)
+    im_diff = encoded_image_yuv - image_input_yuv
+    im_diff += im_diff * falloff_im.unsqueeze_(0)
+    yuv_loss = torch.mean((im_diff) ** 2, axis=[0, 2, 3])
+    yuv_scales = torch.Tensor(yuv_scales)
+    if args.cuda:
+        yuv_scales = yuv_scales.cuda()
+    image_loss = torch.dot(yuv_loss, yuv_scales)
+
+    D_loss = D_output_real - D_output_fake
+    G_loss = D_output_fake  # todo: figure out what it means
+    loss = (
+        loss_scales[0] * image_loss
+        + loss_scales[1] * lpips_loss
+        + loss_scales[2] * secret_loss
     )
+    if not args.no_gan:
+        loss += loss_scales[3] * G_loss
 
-size = (int(image_input.shape[2]), int(image_input.shape[3]))
-gain = 10
-falloff_speed = 4
-falloff_im = np.ones(size)
-for i in range(int(falloff_im.shape[0] / falloff_speed)):  # for i in range 100
-    falloff_im[-i, :] *= (
-        np.cos(4 * np.pi * i / size[0] + np.pi) + 1
-    ) / 2  # [cos[(4*pi*i/400)+pi] + 1]/2
-    falloff_im[i, :] *= (
-        np.cos(4 * np.pi * i / size[0] + np.pi) + 1
-    ) / 2  # [cos[(4*pi*i/400)+pi] + 1]/2
-for j in range(int(falloff_im.shape[1] / falloff_speed)):
-    falloff_im[:, -j] *= (np.cos(4 * np.pi * j / size[0] + np.pi) + 1) / 2
-    falloff_im[:, j] *= (np.cos(4 * np.pi * j / size[0] + np.pi) + 1) / 2
-falloff_im = 1 - falloff_im
-falloff_im = torch.from_numpy(falloff_im).float()
-if args.cuda:
-    falloff_im = falloff_im.cuda()
-falloff_im *= l2_edge_gain
+    writer.add_scalar("loss/image_loss", image_loss, global_step)
+    writer.add_scalar("loss/lpips_loss", lpips_loss, global_step)
+    writer.add_scalar("loss/secret_loss", secret_loss, global_step)
+    writer.add_scalar("loss/G_loss", G_loss, global_step)
+    writer.add_scalar("loss/loss", loss, global_step)
 
-encoded_image_yuv = color.rgb_to_yuv(encoded_image)
-avg_encoded = torch.mean(encoded_image_yuv)
-max_encoded = torch.max(encoded_image_yuv)
-image_input_yuv = color.rgb_to_yuv(image_input)
-avg_image = torch.mean(image_input_yuv)
-max_image = torch.max(image_input_yuv)
-im_diff = encoded_image_yuv - image_input_yuv
-im_diff += im_diff * falloff_im.unsqueeze_(0)
-yuv_loss = torch.mean((im_diff) ** 2, axis=[0, 2, 3])
-yuv_scales = torch.Tensor(yuv_scales)
-if args.cuda:
-    yuv_scales = yuv_scales.cuda()
-image_loss = torch.dot(yuv_loss, yuv_scales)
+    writer.add_scalar("metric/bit_acc", bit_acc, global_step)
+    writer.add_scalar("metric/str_acc", str_acc, global_step)
 
-D_loss = D_output_real - D_output_fake
-G_loss = D_output_fake  # todo: figure out what it means
-loss = (
-    loss_scales[0] * image_loss
-    + loss_scales[1] * lpips_loss
-    + loss_scales[2] * secret_loss
-)
-if not args.no_gan:
-    loss += loss_scales[3] * G_loss
+    writer.add_scalar("loss/avg_enc", avg_encoded, global_step)
+    writer.add_scalar("loss/avg_img", avg_image, global_step)
+    writer.add_scalar("loss/max_enc", max_encoded, global_step)
+    writer.add_scalar("loss/max_img", max_image, global_step)
+    writer.add_scalar("loss/decipher_indicator", decipher_indicator, global_step)
+    writer.add_scalar("loss/trans_max", torch.max(transformed_image), global_step)
+    writer.add_scalar("loss/enc_max", torch.max(encoded_warped), global_step)
 
-writer.add_scalar("loss/image_loss", image_loss, global_step)
-writer.add_scalar("loss/lpips_loss", lpips_loss, global_step)
-writer.add_scalar("loss/secret_loss", secret_loss, global_step)
-writer.add_scalar("loss/G_loss", G_loss, global_step)
-writer.add_scalar("loss/loss", loss, global_step)
-
-writer.add_scalar("metric/bit_acc", bit_acc, global_step)
-writer.add_scalar("metric/str_acc", str_acc, global_step)
-
-writer.add_scalar("loss/avg_enc", avg_encoded, global_step)
-writer.add_scalar("loss/avg_img", avg_image, global_step)
-writer.add_scalar("loss/max_enc", max_encoded, global_step)
-writer.add_scalar("loss/max_img", max_image, global_step)
-writer.add_scalar("loss/decipher_indicator", decipher_indicator, global_step)
-writer.add_scalar("loss/trans_max", torch.max(transformed_image), global_step)
-writer.add_scalar("loss/enc_max", torch.max(encoded_warped), global_step)
-
-if global_step % 20 == 0:
+    if global_step % 20 == 0:
     writer.add_image("input/image_input", image_input[0], global_step)
     writer.add_image("input/image_warped", input_warped[0], global_step)
     writer.add_image(
@@ -639,4 +639,3 @@ if global_step % 20 == 0:
         "transformed/transformed_image", transformed_image[0], global_step
     )
     writer.add_image("transformed/test", test_transform[0], global_step)
-return loss, secret_loss, D_loss, bit_acc, str_acc
