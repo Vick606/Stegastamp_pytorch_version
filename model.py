@@ -274,7 +274,6 @@ class StegaStampEncoderUnet(nn.Module):
         self.outc = UNet.OutConv(64, input_channels)
         self.conv2 = nn.Conv2d(input_channels, 3, 15, padding=0)
         self.sig = nn.Sigmoid()
-        
 
     def forward(self, inputs):
         secret, image = inputs
@@ -288,7 +287,6 @@ class StegaStampEncoderUnet(nn.Module):
         image_converted = nn.functional.interpolate(
             image_converted, scale_factor=(1 / 8, 1 / 8)
         )
-        # secret_enlarged = nn.Upsample(scale_factor=(8, 8))(secret)
 
         inputs = torch.cat([secret, image_converted], dim=1)
         conv1 = self.conv1(inputs)
