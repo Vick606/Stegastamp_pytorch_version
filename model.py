@@ -6,7 +6,7 @@ import utils
 import torch
 import numpy as np
 from torch import nn
-import torchgeometry
+import kornia as torchgeometry
 from kornia import color
 import torch.nn.functional as F
 import warnings
