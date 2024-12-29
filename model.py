@@ -428,7 +428,7 @@ def transform_net(encoded_image, args, global_step):
     return encoded_image
 
     def get_secret_acc(secret_true, secret_pred):
-    if "cuda" in str(secret_pred.device):
+     if "cuda" in str(secret_pred.device):
         secret_pred = secret_pred.cpu()
         secret_true = secret_true.cpu()
     secret_pred = torch.round(secret_pred)
@@ -620,7 +620,7 @@ def build_model(
     writer.add_scalar("loss/enc_max", torch.max(encoded_warped), global_step)
 
     if global_step % 20 == 0:
-    writer.add_image("input/image_input", image_input[0], global_step)
+     writer.add_image("input/image_input", image_input[0], global_step)
     writer.add_image("input/image_warped", input_warped[0], global_step)
     writer.add_image(
         "encoded/encoded_warped",
