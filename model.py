@@ -16,11 +16,12 @@ from torchvision import transforms
 
 
 def convert_to_colorspace(image, color_space):
-    """Convert RGB image to specified color space"""
+    """Convert RGB image to specified color space with normalization and clipping"""
+    image = torch.clamp(image, 0.0, 1.0)  # Ensure input is within [0,1]
     if color_space == "RGB":
         return image
     elif color_space == "HSI":
-        return color.rgb_to_hsv(image)
+        return torch.clamp(color.rgb_to_hsv(image), 0.0, 1.0)
     elif color_space == "CMYK":
         # Convert RGB [0,1] to CMYK
         r, g, b = image[:, 0], image[:, 1], image[:, 2]
@@ -28,24 +29,26 @@ def convert_to_colorspace(image, color_space):
         c = (1 - r - k) / (1 - k + 1e-8)
         m = (1 - g - k) / (1 - k + 1e-8)
         y = (1 - b - k) / (1 - k + 1e-8)
-        return torch.stack([c, m, y, k], dim=1)
+        cmyk = torch.stack([c, m, y, k], dim=1)
+        return torch.clamp(cmyk, 0.0, 1.0)
     else:
         raise ValueError(f"Unsupported color space: {color_space}")
 
 
 def convert_from_colorspace(image, color_space):
-    """Convert from specified color space back to RGB"""
+    """Convert from specified color space back to RGB with normalization and clipping"""
     if color_space == "RGB":
-        return image
+        return torch.clamp(image, 0.0, 1.0)
     elif color_space == "HSI":
-        return color.hsv_to_rgb(image)
+        return torch.clamp(color.hsv_to_rgb(image), 0.0, 1.0)
     elif color_space == "CMYK":
         # Convert CMYK back to RGB [0,1]
         c, m, y, k = image[:, 0], image[:, 1], image[:, 2], image[:, 3]
         r = (1 - c) * (1 - k)
         g = (1 - m) * (1 - k)
         b = (1 - y) * (1 - k)
-        return torch.stack([r, g, b], dim=1)
+        rgb = torch.stack([r, g, b], dim=1)
+        return torch.clamp(rgb, 0.0, 1.0)
     else:
         raise ValueError(f"Unsupported color space: {color_space}")
 
@@ -99,7 +102,7 @@ class Conv2D(nn.Module):
     def forward(self, inputs):
         outputs = self.conv(inputs)
         if self.activation is not None:
-            if self.activation == "relu":
+            if self.activation is not None:
                 outputs = nn.ReLU(inplace=True)(outputs)
             else:
                 raise NotImplementedError
